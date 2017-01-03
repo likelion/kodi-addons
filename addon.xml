@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<addon id="plugin.video.kartina.my"
+       name="Kartina.MY"
+       version="0.1"
+       provider-name="Leonid Mokrushin">
+  <requires>
+    <import addon="xbmc.python" version="2.1.0"/>
+  </requires>
+  <extension point="xbmc.python.pluginsource"
+             provides="video"
+             library="default.py">
+    <provides>video</provides>
+  </extension>
+  <extension point="xbmc.addon.metadata">
+    <summary>Онлайн-телевидение Kartina.TV</summary>
+    <description>
+      Интернет-телевидение в любой точке мира: более 150 каналов, видеотека, архив, мультирум
+    </description>
+    <platform>all</platform>
+  </extension>
+</addon>
