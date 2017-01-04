@@ -3,5 +3,6 @@
 	<category label="General">
 		<setting id="username" type="text" label="User name" default="" />
 		<setting id="password" type="text" label="Password" option="hidden" default="" />
+		<setting id="protect" type="text" label="Protect code" option="hidden" default="" />
 	</category>
 </settings>
