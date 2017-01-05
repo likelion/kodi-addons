@@ -62,12 +62,14 @@ def list_channels(sid):
     for group in doc.get('groups'):
         for channel in group.get('channels'):
             if channel.get('is_video') == 1:
-                label = channel.get('name')
+                label = '[COLOR white]' + channel.get('name') + '[/COLOR]'
+                if 'epg_progname' in channel:
+                    label += ' - ' + channel.get('epg_progname').splitlines()[0]
                 arch = channel.get('have_archive')
                 if arch == 1:
-                    label = '[COLOR red]'+u"\u2022"+'[/COLOR] '+label
+                    label = '[COLOR red]' + u'\u2022' + '[/COLOR] ' + label
                 else:
-                    label = '[COLOR gray]'+u"\u2022"+'[/COLOR] '+label
+                    label = '[COLOR gray]' + u'\u2022' + '[/COLOR] ' + label
                 list_item = xbmcgui.ListItem(label=label)
                 list_item.setArt({'thumb': channel.get('icon_link')})
                 url = get_url(action='play', cid=channel.get('id'), sid=sid, arch=arch)
@@ -94,31 +96,20 @@ class MyPlayer(xbmc.Player):
         self.cid = cid
         self.arch = arch
         self.gmt = -1
+        self.max = -1
 
     def play_channel(self):
-        if self.gmt == -1:
-            doc = api_call(self.sid, 'settings', var='stream_standard')
-            self.max = int(doc.get('servertime'))
-            length = doc.get('settings').get('list')[0].get('catchup').get('length')
-            self.min = self.max - length
-            self.gmt = self.max-60*60
-        else:
-            if self.gmt < self.min:
-                self.gmt = self.min
-            elif self.gmt > self.max:
-                self.gmt = self.max
         #xbmc.log('sid='+self.sid+' cid='+str(self.cid))
         #xbmc.log('--------- playing from '+str(self.gmt))
-        if self.arch == '1':
-            doc = api_call(self.sid, 'get_url', cid=self.cid, gmt=self.gmt, protect_code=get_setting('protect'))
-        else:
+        if self.gmt ==  -1:
             doc = api_call(self.sid, 'get_url', cid=self.cid, protect_code=get_setting('protect'))
+        else:
+            doc = api_call(self.sid, 'get_url', cid=self.cid, gmt=self.gmt, protect_code=get_setting('protect'))
         url = doc.get('url')
         #xbmc.log('url='+str(url))
         url = re.sub('http/ts(.*?)\s(.*)', 'http\\1', url)
-        li = xbmcgui.ListItem('My program')
-        li.addStreamInfo('video', {'width':331, 'duration': 1801})
-
+        li = xbmcgui.ListItem(str(self.gmt) + ' ' + str(self.max))
+        #li.addStreamInfo('video', {'width':331, 'duration': 1801})
         self.play(url, li)
 
     def onPlayBackStopped(self):
@@ -127,9 +118,19 @@ class MyPlayer(xbmc.Player):
         #xbmc.log("stopped!!!!!!")
 
     def onPlayBackSeek(self, time, seekOffset):
-        if self.arch == '1':
+        if self.arch == '1' and not (self.gmt == -1 and seekOffset >= 0):
             self.pause()
+            doc = api_call(self.sid, 'settings', var='stream_standard')
+            self.max = int(doc.get('servertime')) - 30*60
+            length = doc.get('settings').get('list')[0].get('catchup').get('length')
+            self.min = self.max - length
+            if self.gmt == -1:
+                self.gmt = self.max
             self.gmt = self.gmt + int(self.getTime()) + int(seekOffset/1000)
+            if self.gmt < self.min:
+                self.gmt = self.min
+            elif self.gmt > self.max:
+                self.gmt = -1
             #xbmc.log('--------- seeking '+str(int(seekOffset/1000))+' to '+str(self.gmt))
             self.play_channel()
 
