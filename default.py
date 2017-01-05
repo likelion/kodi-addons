@@ -14,6 +14,7 @@ import xbmcaddon
 import xbmcgui
 import xbmcplugin
 import re
+from time import gmtime, strftime
 
 # Get the plugin url in plugin:// notation.
 _url = sys.argv[0]
@@ -63,17 +64,26 @@ def list_channels(sid):
         for channel in group.get('channels'):
             if channel.get('is_video') == 1:
                 label = '[COLOR white]' + channel.get('name') + '[/COLOR]'
-                if 'epg_progname' in channel:
-                    label += ' - ' + channel.get('epg_progname').splitlines()[0]
                 arch = channel.get('have_archive')
                 if arch == 1:
                     label = '[COLOR red]' + u'\u2022' + '[/COLOR] ' + label
                 else:
                     label = '[COLOR gray]' + u'\u2022' + '[/COLOR] ' + label
+                info = None
+                if 'epg_progname' in channel:
+                    progname = channel.get('epg_progname').splitlines();
+                    label += ' - ' + progname[0]
+                    info = {'title': progname[0]}
+                    if len(progname) > 1:
+                        info['plot'] = ' '.join(progname[1:])
+                    if 'epg_start' in channel and 'epg_end' in channel:
+                        info['duration'] = channel.get('epg_end') - channel.get('epg_start')
                 list_item = xbmcgui.ListItem(label=label)
+                if info != None:
+                    list_item.setInfo('video', info)
                 list_item.setArt({'thumb': channel.get('icon_link')})
                 url = get_url(action='play', cid=channel.get('id'), sid=sid, arch=arch)
-                xbmcplugin.addDirectoryItem(_handle, url, list_item, False)
+                xbmcplugin.addDirectoryItem(_handle, url, list_item, True)
     xbmc.executebuiltin('Container.SetViewMode(51)')
     xbmcplugin.endOfDirectory(_handle)
 
@@ -97,6 +107,7 @@ class MyPlayer(xbmc.Player):
         self.arch = arch
         self.gmt = -1
         self.max = -1
+        self.min = -1
 
     def play_channel(self):
         #xbmc.log('sid='+self.sid+' cid='+str(self.cid))
@@ -108,7 +119,9 @@ class MyPlayer(xbmc.Player):
         url = doc.get('url')
         #xbmc.log('url='+str(url))
         url = re.sub('http/ts(.*?)\s(.*)', 'http\\1', url)
-        li = xbmcgui.ListItem(str(self.gmt) + ' ' + str(self.max))
+        s = strftime("%d %b %H:%M:%S", gmtime(self.gmt-8))
+        i = strftime("%d %b %H:%M:%S", gmtime(self.min-8))
+        li = xbmcgui.ListItem(s + ' [' + i + ']')
         #li.addStreamInfo('video', {'width':331, 'duration': 1801})
         self.play(url, li)
 
@@ -121,9 +134,9 @@ class MyPlayer(xbmc.Player):
         if self.arch == '1' and not (self.gmt == -1 and seekOffset >= 0):
             self.pause()
             doc = api_call(self.sid, 'settings', var='stream_standard')
-            self.max = int(doc.get('servertime')) - 30*60
-            length = doc.get('settings').get('list')[0].get('catchup').get('length')
-            self.min = self.max - length
+            catchup = doc.get('settings').get('list')[0].get('catchup') 
+            self.max = int(doc.get('servertime')) - catchup.get('delay')
+            self.min = self.max - catchup.get('length')
             if self.gmt == -1:
                 self.gmt = self.max
             self.gmt = self.gmt + int(self.getTime()) + int(seekOffset/1000)
