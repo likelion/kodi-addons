@@ -14,7 +14,8 @@ import xbmcaddon
 import xbmcgui
 import xbmcplugin
 import re
-from time import gmtime, strftime
+import os
+from time import strftime, time, localtime
 
 # Get the plugin url in plugin:// notation.
 _url = sys.argv[0]
@@ -63,30 +64,51 @@ def list_channels(sid):
     for group in doc.get('groups'):
         for channel in group.get('channels'):
             if channel.get('is_video') == 1:
+                li = xbmcgui.ListItem()
                 label = '[COLOR white]' + channel.get('name') + '[/COLOR]'
                 arch = channel.get('have_archive')
                 if arch == 1:
                     label = '[COLOR red]' + u'\u2022' + '[/COLOR] ' + label
+                    url = get_url(action='epg', cid=channel.get('id'), sid=sid)
+                    li.addContextMenuItems([('EPG and Archive','XBMC.Container.Update(%s)'%url)])
                 else:
                     label = '[COLOR gray]' + u'\u2022' + '[/COLOR] ' + label
-                info = None
                 if 'epg_progname' in channel:
-                    progname = channel.get('epg_progname').splitlines();
+                    progname = channel.get('epg_progname').splitlines()
                     label += ' - ' + progname[0]
                     info = {'title': progname[0]}
                     if len(progname) > 1:
                         info['plot'] = ' '.join(progname[1:])
                     if 'epg_start' in channel and 'epg_end' in channel:
                         info['duration'] = channel.get('epg_end') - channel.get('epg_start')
-                list_item = xbmcgui.ListItem(label=label)
-                if info != None:
-                    list_item.setInfo('video', info)
-                list_item.setArt({'thumb': channel.get('icon_link')})
-                url = get_url(action='play', cid=channel.get('id'), sid=sid, arch=arch)
-                xbmcplugin.addDirectoryItem(_handle, url, list_item, True)
+                    li.setInfo('video', info)
+                li.setLabel(label)
+                li.setArt({'thumb': channel.get('icon_link')})
+                url = get_url(action='play', cid=channel.get('id'), sid=sid, arch=arch, gmt='-1')
+                xbmcplugin.addDirectoryItem(_handle, url, li, True)
+    xbmc.executebuiltin('Container.SetViewMode(51)')
+    xbmcplugin.endOfDirectory(_handle, cacheToDisc=True)
+
+def list_epg(sid, cid):
+    doc = api_call(sid, 'epg', cid=cid, day=strftime("%d%m%y", localtime(time())))
+    st = int(doc.get('servertime'))
+    for epg in doc.get('epg'):
+        ut_start = int(epg.get('ut_start'))
+        progname = epg.get('progname').splitlines();
+        label = '[COLOR cyan]['+strftime("%H:%M", localtime(ut_start))+'][/COLOR] - '+progname[0]
+        if st > ut_start:
+            label = '[COLOR white]' + label + '[/COLOR]'
+        else:
+            label = '[I]' + label + '[/I]'
+        li = xbmcgui.ListItem(label=label)
+        info = {'title': progname[0]}
+        if len(progname) > 1:
+            info['plot'] = ' '.join(progname[1:])
+        li.setInfo('video', info)
+        url = get_url(action='play', cid=cid, sid=sid, arch=1, gmt=ut_start)
+        xbmcplugin.addDirectoryItem(_handle, url, li, False)
     xbmc.executebuiltin('Container.SetViewMode(51)')
     xbmcplugin.endOfDirectory(_handle)
-
 
 class MyMonitor(xbmc.Monitor):
 
@@ -100,12 +122,12 @@ class MyMonitor(xbmc.Monitor):
 
 class MyPlayer(xbmc.Player):
 
-    def __init__ (self, sid, cid, arch):
+    def __init__ (self, sid, cid, arch, gmt):
         xbmc.Player.__init__(self)
         self.sid = sid
         self.cid = cid
         self.arch = arch
-        self.gmt = -1
+        self.gmt = int(gmt)
         self.max = -1
         self.min = -1
 
@@ -117,10 +139,9 @@ class MyPlayer(xbmc.Player):
         else:
             doc = api_call(self.sid, 'get_url', cid=self.cid, gmt=self.gmt, protect_code=get_setting('protect'))
         url = doc.get('url')
-        #xbmc.log('url='+str(url))
         url = re.sub('http/ts(.*?)\s(.*)', 'http\\1', url)
-        s = strftime("%d %b %H:%M:%S", gmtime(self.gmt-8))
-        i = strftime("%d %b %H:%M:%S", gmtime(self.min-8))
+        s = strftime("%d %b %H:%M:%S", localtime(self.gmt))
+        i = strftime("%d %b %H:%M:%S", localtime(self.min))
         li = xbmcgui.ListItem(s + ' [' + i + ']')
         #li.addStreamInfo('video', {'width':331, 'duration': 1801})
         self.play(url, li)
@@ -149,9 +170,9 @@ class MyPlayer(xbmc.Player):
 
 closescript = False
 
-def play_video(sid, cid, arch):
+def play_video(sid, cid, arch, gmt):
     monitor = MyMonitor()
-    player = MyPlayer(sid=sid, cid=cid, arch=arch)
+    player = MyPlayer(sid=sid, cid=cid, arch=arch, gmt=gmt)
     player.play_channel()
     while not ( closescript ):
         xbmc.sleep(500)
@@ -176,7 +197,9 @@ def router(paramstring):
         #xbmc.log('in params: '+sid)
         if params['action'] == 'play':
             # Play a video from a provided URL.
-            play_video(sid, params['cid'], params['arch'])
+            play_video(sid, params['cid'], params['arch'], params['gmt'])
+        elif params['action'] == 'epg':
+            list_epg(sid, params['cid'])
         else:
             # If the provided paramstring does not contain a supported action
             # we raise an exception. This helps to catch coding errors,
