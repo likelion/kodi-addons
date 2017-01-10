@@ -25,24 +25,19 @@ _api = 'https://iptv.kartina.tv/api/json/'
 def get_setting(setting):
     return xbmcaddon.Addon().getSetting(setting)
 
-def get_sid():
-    url = '%slogin?login=%s&pass=%s'%(_api, get_setting('username'), get_setting('password'))
-    req = urllib2.Request(url)
-    res = urllib2.urlopen(req)
-    body = res.read()
-    sid = json.loads(body).get('sid')
-    res.close()
-    return sid
-
 def api_call(sid, method, **kwargs):
     url = '%s%s?%s'%(_api, method, urlencode(kwargs))
     xbmc.log('URL = '+url)
     req = urllib2.Request(url)
-    req.add_header('Cookie', 'MW_SSID=%s'%sid)
+    if sid != None:
+        req.add_header('Cookie', 'MW_SSID=%s'%sid)
     res = urllib2.urlopen(req)
     body = res.read()
     doc = json.loads(body)
     res.close()
+    if 'error' in doc:
+        xbmc.executebuiltin('XBMC.Notification(KartinaTV, %s, 5000)' % doc.get('error').get('message'))
+        return None
     return doc
 
 def get_url(**kwargs):
@@ -50,6 +45,8 @@ def get_url(**kwargs):
 
 def list_channels(sid):
     doc = api_call(sid, 'channel_list', show='all', protect_code=get_setting('protect'))
+    if doc == None:
+        return
     for group in doc.get('groups'):
         for channel in group.get('channels'):
             if channel.get('is_video') == 1:
@@ -70,7 +67,7 @@ def list_channels(sid):
                     if len(progname) > 1:
                         info['plot'] = ' '.join(progname[1:])
                     if 'epg_start' in channel and 'epg_end' in channel:
-                        start = '[[B]%s[/B]] '%datetime.datetime.fromtimestamp(channel.get('epg_start')).strftime("%H:%M")
+                        start = '[[B]%s[/B]] '%datetime.datetime.fromtimestamp(channel.get('epg_start')).strftime('%H:%M')
                         info['duration'] = channel.get('epg_end') - channel.get('epg_start')
                     li.setInfo('video', info)
                 color = group.get('color')[1:]
@@ -87,24 +84,28 @@ def list_channels(sid):
     xbmcplugin.endOfDirectory(_handle, cacheToDisc=True)
 
 def list_epg(sid, cid, date):
-    epg_min, epg_max = get_min_max(sid)
     day = datetime.datetime.fromtimestamp(float(date))
+    doc = api_call(sid, 'epg', cid=cid, day=day.strftime('%d%m%y'))
+    if doc == None:
+        return
+    epg_min, epg_max = get_min_max(sid)
+    if epg_min == None or epg_max == None:
+        return
     if datetime.datetime.fromtimestamp(epg_min) < day.replace(hour=0, minute=0, second=0):
         day_before = day - datetime.timedelta(days=1) 
-        li = xbmcgui.ListItem(label=day_before.strftime("%A, %d %B"))
+        li = xbmcgui.ListItem(label=day_before.strftime('%A, %d %B'))
         url = get_url(action='epg', cid=cid, sid=sid, date=day_before.strftime('%s'))
         xbmcplugin.addDirectoryItem(_handle, url, li, True)
-    doc = api_call(sid, 'epg', cid=cid, day=day.strftime("%d%m%y"))
     st = int(doc.get('servertime'))
     index = 0
     found_index = False
     for epg in doc.get('epg'):
         ut_start = int(epg.get('ut_start'))
-        progname = epg.get('progname').splitlines();
-        label = '[COLOR white][[B]%s[/B]][/COLOR] - %s'%(time.strftime("%H:%M", time.localtime(ut_start)), progname[0])
+        progname = epg.get('progname').splitlines()
+        label = '[COLOR white][[B]%s[/B]][/COLOR] - %s'%(time.strftime('%H:%M', time.localtime(ut_start)), progname[0])
         li = xbmcgui.ListItem()
         li.addStreamInfo('video', { 'codec':'h264' })
-        li.setArt({'thumb': os.path.join(xbmcaddon.Addon().getAddonInfo("path"), 'icon.png')})
+        li.setArt({'thumb': os.path.join(xbmcaddon.Addon().getAddonInfo('path'), 'icon.png')})
         if not found_index:
             if ut_start > st:
                 found_index = True
@@ -134,6 +135,8 @@ def list_epg(sid, cid, date):
 
 def get_min_max(sid):
     doc = api_call(sid, 'settings', var='stream_standard')
+    if doc == None:
+        return (None, None)
     catchup = doc.get('settings').get('list')[0].get('catchup') 
     max = int(doc.get('servertime')) - catchup.get('delay')
     min = max - catchup.get('length')
@@ -166,10 +169,12 @@ class MyPlayer(xbmc.Player):
             doc = api_call(self.sid, 'get_url', cid=self.cid, protect_code=get_setting('protect'))
         else:
             doc = api_call(self.sid, 'get_url', cid=self.cid, gmt=self.gmt, protect_code=get_setting('protect'))
+        if doc == None:
+            return
         url = doc.get('url')
         url = re.sub('http/ts(.*?)\s(.*)', 'http\\1', url)
-        s = time.strftime("%d %b %H:%M", time.localtime(self.gmt))
-        i = time.strftime("%d %b %H:%M", time.localtime(self.min))
+        s = time.strftime('%d %b %H:%M', time.localtime(self.gmt))
+        i = time.strftime('%d %b %H:%M', time.localtime(self.min))
         self.li = xbmcgui.ListItem('%s / %s'%(s,i))
         self.play(url, self.li)
 
@@ -181,6 +186,9 @@ class MyPlayer(xbmc.Player):
         if self.arch == '1' and not (self.gmt == -1 and seekOffset >= 0):
             self.pause()
             self.min, self.max = get_min_max(self.sid)
+            if self.min == None or self.max == None:
+                self.stop()
+                return
             if self.gmt == -1:
                 self.gmt = self.max
             self.gmt = self.gmt + int(self.getTime()) + int(seekOffset/1000)
@@ -196,25 +204,25 @@ def play_video(sid, cid, arch, gmt):
     player.play_channel()
     while not ( closescript ):
         #if player.isPlaying():
-        #    xbmc.log("--- "+str(player.gmt)+" "+str(player.getTime()))
+        #    xbmc.log('--- '+str(player.gmt)+' '+str(player.getTime()))
         xbmc.sleep(500)
 
 def router(paramstring):
     params = dict(parse_qsl(paramstring))
     if params:
-        if params['sid']:
-            sid = params['sid']
-        else:
-            sid = get_sid()
         if params['action'] == 'play':
-            play_video(sid, params['cid'], params['arch'], params['gmt'])
+            play_video(params['sid'], params['cid'], params['arch'], params['gmt'])
         elif params['action'] == 'epg':
-            list_epg(sid, params['cid'], params['date'])
+            list_epg(params['sid'], params['cid'], params['date'])
         else:
-            raise ValueError('Invalid paramstring: {0}!'.format(paramstring))
+            xbmc.executebuiltin('XBMC.Notification(KartinaTV, Invalid paramstring: %s, 5000)' % paramstring)
     else:
-        sid = get_sid()
-        list_channels(sid)
+        doc = api_call(None, 'login', **{'login': get_setting('username'), 'pass': get_setting('password')})
+        if doc == None:
+            xbmc.sleep(2000)
+            xbmcaddon.Addon().openSettings()
+            return
+        list_channels(doc.get('sid'))
 
 if __name__ == '__main__':
     router(sys.argv[2][1:])
