@@ -1,3 +1,7 @@
+# Kodi addon repository
+
+To install my repository, go to System->File manager->Add source and add a source with URL: "http://kodi.mokrush.in/". Then go to System->Settings->Add-ons->Install from zip file, select this source and install repository.likelion-x.x.x.zip.
+
 # plugin.video.kartinatv
 
 Video plugin for Kodi to watch content from Kartina.TV.
