@@ -5,7 +5,7 @@
 # License: GPL v.3 https://www.gnu.org/copyleft/gpl.html
 
 import sys
-from urllib import urlencode
+from urllib import urlencode, quote, unquote
 from urlparse import parse_qsl
 import urllib2
 import json
@@ -17,16 +17,19 @@ import re
 import os
 import time
 import datetime
+from HTMLParser import HTMLParser
 
 _url = sys.argv[0]
 _handle = int(sys.argv[1])
-_api = 'https://iptv.kartina.tv/api/json/'
+_api = 'http://iptv.kartina.tv/api/json/'
+_apis = 'https://iptv.kartina.tv/api/json/'
+_assets = 'http://anysta.kartina.tv/assets'
 
 def get_setting(setting):
     return xbmcaddon.Addon().getSetting(setting)
 
-def api_call(sid, method, **kwargs):
-    url = '%s%s?%s'%(_api, method, urlencode(kwargs))
+def api_call(api, sid, method, **kwargs):
+    url = '%s%s?%s'%(api, method, urlencode(kwargs))
     xbmc.log('URL = '+url)
     req = urllib2.Request(url)
     if sid != None:
@@ -44,20 +47,24 @@ def get_url(**kwargs):
     return '%s?%s'%(_url, urlencode(kwargs))
 
 def list_channels(sid):
-    doc = api_call(sid, 'channel_list', show='all', protect_code=get_setting('protect'))
+    doc = api_call(_apis, sid, 'channel_list', show='all', protect_code=get_setting('protect'))
     if doc == None:
         return
     for group in doc.get('groups'):
         for channel in group.get('channels'):
             if channel.get('is_video') == 1:
                 li = xbmcgui.ListItem()
+                menu = []
                 arch = channel.get('have_archive')
                 if arch == 1:
                     rec = '[COLOR red]%s[/COLOR]'%u'\u2022'
                     url = get_url(action='epg', cid=channel.get('id'), sid=sid, date=time.time())
-                    li.addContextMenuItems([('Archive','XBMC.Container.Update(%s)'%url)], replaceItems=True)
+                    menu.append(('Archive','XBMC.Container.Update(%s)'%url))
                 else:
                     rec = '[COLOR gray]%s[/COLOR]'%u'\u2022'
+                url = get_url(action='vod_genres', sid=sid)
+                menu.append(('Video library', 'XBMC.Container.Update(%s)'%url))
+                li.addContextMenuItems(menu, replaceItems=True)
                 start = ' [B]--------[/B]  '
                 program = ''
                 if 'epg_progname' in channel:
@@ -81,18 +88,18 @@ def list_channels(sid):
                 url = get_url(action='play', cid=channel.get('id'), sid=sid, arch=arch, gmt='-1')
                 xbmcplugin.addDirectoryItem(_handle, url, li, False)
     xbmc.executebuiltin('Container.SetViewMode(51)')
-    xbmcplugin.endOfDirectory(_handle, cacheToDisc=True)
+    xbmcplugin.endOfDirectory(_handle, cacheToDisc=False)
 
 def list_epg(sid, cid, date):
     day = datetime.datetime.fromtimestamp(float(date))
-    doc = api_call(sid, 'epg', cid=cid, day=day.strftime('%d%m%y'))
+    doc = api_call(_apis, sid, 'epg', cid=cid, day=day.strftime('%d%m%y'))
     if doc == None:
         return
     epg_min, epg_max = get_min_max(sid)
     if epg_min == None or epg_max == None:
         return
     if datetime.datetime.fromtimestamp(epg_min) < day.replace(hour=0, minute=0, second=0):
-        day_before = day - datetime.timedelta(days=1) 
+        day_before = day - datetime.timedelta(days=1)
         li = xbmcgui.ListItem(label=day_before.strftime('%A, %d %B'))
         url = get_url(action='epg', cid=cid, sid=sid, date=day_before.strftime('%s'))
         xbmcplugin.addDirectoryItem(_handle, url, li, True)
@@ -124,7 +131,7 @@ def list_epg(sid, cid, date):
         url = get_url(action='play', cid=cid, sid=sid, arch=1, gmt=ut_start)
         xbmcplugin.addDirectoryItem(_handle, url, li, False)
     xbmc.executebuiltin('Container.SetViewMode(51)')
-    xbmcplugin.endOfDirectory(_handle, True)
+    xbmcplugin.endOfDirectory(_handle, cacheToDisc=False)
     xbmc.sleep(100)
     if found_index:
         try:
@@ -133,11 +140,79 @@ def list_epg(sid, cid, date):
         except:
             pass
 
+def vod_genres(sid):
+    doc = api_call(_api, sid, 'vod_genres')
+    for genre in doc.get('genres'):
+        url = get_url(action='vod_list', sid=sid, id=genre.get('id'), page=1)
+        li = xbmcgui.ListItem(label=genre.get('name'))
+        li.setProperty('isPlayable', 'false')
+        xbmcplugin.addDirectoryItem(_handle, url, li, True)
+    xbmc.executebuiltin('Container.SetViewMode(50)')
+    xbmcplugin.endOfDirectory(_handle, cacheToDisc=False)
+
+def vod_list(sid, id, page):
+    doc = api_call(_apis, sid, 'vod_list', type='last', genre=id, page=page)
+    xbmcplugin.setContent(_handle, 'Movies')
+    html = HTMLParser()
+    for row in doc.get('rows'):
+        url = get_url(action='vod_info', sid=sid, id=row.get('id'))
+        name = html.unescape(row.get('name'))
+        li = xbmcgui.ListItem(label=name)
+        li.setProperty('isPlayable', 'false')
+        info = {}
+        info['title'] = name
+        info['plot'] = html.unescape(row.get('description'))
+        info['rating'] = float(row.get('rate_imdb'))
+        info['userrating'] = row.get('rate_kinopoisk')
+        info['year'] = int(row.get('year'))
+        info['mpaa'] = row.get('rate_mpaa')
+        li.setInfo('video', info)
+        poster = row.get('poster_link')
+        if poster == None:
+            poster = '%s%s'%(_assets,row.get('poster'))
+        li.setArt({'poster': poster, 'fanart': poster})
+        xbmcplugin.addDirectoryItem(_handle, url, li, True)
+    page = int(page)
+    total = int(doc.get('total'))
+    if 20 * page < total:
+        url = get_url(action='vod_list', sid=sid, id=id, page=page+1)
+        li = xbmcgui.ListItem(label='[ [COLOR lightgreen]Page %s[/COLOR] ]'%(page+1))
+        li.setProperty('isPlayable', 'false')
+        xbmcplugin.addDirectoryItem(_handle, url, li, True)
+    xbmc.executebuiltin('Container.SetViewMode(515)')
+    xbmcplugin.endOfDirectory(_handle, cacheToDisc=False)
+
+def vod_info(sid, id):
+    doc = api_call(_apis, sid, 'vod_info', id=id)
+    options = []
+    ids = []
+    names = []
+    html = HTMLParser()
+    film = doc.get('film')
+    name = html.unescape(film.get('name'))
+    li = xbmcgui.ListItem()
+    poster = film.get('poster_link')
+    if poster == None:
+        poster = '%s%s'%(_assets, film.get('poster'))
+    li.setArt({'thumb': poster})
+    for video in film.get('videos'):
+        options.append(html.unescape(video.get('title')))
+        ids.append(video.get('id'))
+        names.append(('%s (%s)'%(film.get('name'),video.get('title'))).encode('utf8'))
+    r = xbmcgui.Dialog().select(film.get('name'), options)
+    if r > -1:
+        li.setLabel(names[r])
+        vod_play(sid, ids[r], li)
+
+def vod_play(sid, id, li):
+    doc = api_call(_apis, sid, 'vod_geturl', fileid=id)
+    xbmc.Player().play(doc.get('url'), li)
+
 def get_min_max(sid):
-    doc = api_call(sid, 'settings', var='stream_standard')
+    doc = api_call(_apis, sid, 'settings', var='stream_standard')
     if doc == None:
         return (None, None)
-    catchup = doc.get('settings').get('list')[0].get('catchup') 
+    catchup = doc.get('settings').get('list')[0].get('catchup')
     max = int(doc.get('servertime')) - catchup.get('delay')
     min = max - catchup.get('length')
     return (min, max)
@@ -166,9 +241,9 @@ class MyPlayer(xbmc.Player):
 
     def play_channel(self):
         if self.gmt ==  -1:
-            doc = api_call(self.sid, 'get_url', cid=self.cid, protect_code=get_setting('protect'))
+            doc = api_call(_apis, self.sid, 'get_url', cid=self.cid, protect_code=get_setting('protect'))
         else:
-            doc = api_call(self.sid, 'get_url', cid=self.cid, gmt=self.gmt, protect_code=get_setting('protect'))
+            doc = api_call(_apis, self.sid, 'get_url', cid=self.cid, gmt=self.gmt, protect_code=get_setting('protect'))
         if doc == None:
             return
         url = doc.get('url')
@@ -214,10 +289,16 @@ def router(paramstring):
             play_video(params['sid'], params['cid'], params['arch'], params['gmt'])
         elif params['action'] == 'epg':
             list_epg(params['sid'], params['cid'], params['date'])
+        elif params['action'] == 'vod_genres':
+            vod_genres(params['sid'])
+        elif params['action'] == 'vod_list':
+            vod_list(params['sid'], params['id'], params['page'])
+        elif params['action'] == 'vod_info':
+            vod_info(params['sid'], params['id'])
         else:
             xbmc.executebuiltin('XBMC.Notification(KartinaTV, Invalid paramstring: %s, 5000)' % paramstring)
     else:
-        doc = api_call(None, 'login', **{'login': get_setting('username'), 'pass': get_setting('password')})
+        doc = api_call(_apis, None, 'login', **{'login': get_setting('username'), 'pass': get_setting('password')})
         if doc == None:
             xbmc.sleep(2000)
             xbmcaddon.Addon().openSettings()
