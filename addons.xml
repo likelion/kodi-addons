@@ -2,7 +2,7 @@
 <addons>
 <addon id="plugin.video.kartinatv"
        name="KartinaTV"
-       version="1.0.1"
+       version="1.0.2"
        provider-name="Leonid Mokrushin">
   <requires>
     <import addon="xbmc.python" version="2.1.0"/>
@@ -23,12 +23,12 @@
 
 <addon id="repository.likelion"
        name="Likelion Kodi Add-ons"
-       version="1.0.0"
+       version="1.0.2"
        provider-name="Leonid Mokrushin">
 	<extension point="xbmc.addon.repository" name="Likelion Kodi Add-ons">
-		<info compressed="false">https://github.com/likelion/kodi-addons/raw/master/addons.xml</info>
-		<checksum>https://github.com/likelion/kodi-addons/raw/master/addons.xml.md5</checksum>
-		<datadir zip="true">https://github.com/likelion/kodi-addons/raw/master/</datadir>
+		<info compressed="false">https://raw.githubusercontent.com/likelion/kodi-addons/master/addons.xml</info>
+		<checksum>https://raw.githubusercontent.com/likelion/kodi-addons/master/addons.xml.md5</checksum>
+		<datadir zip="true">https://raw.githubusercontent.com/likelion/kodi-addons/master/</datadir>
 	</extension>
 	<extension point="xbmc.addon.metadata">
 		<summary>Install Add-ons from Likelion Kodi Add-on Repository</summary>
