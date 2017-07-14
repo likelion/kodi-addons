@@ -2,7 +2,7 @@
 <addons>
 <addon id="plugin.video.kartinatv"
        name="KartinaTV"
-       version="1.0.2"
+       version="1.0.3"
        provider-name="Leonid Mokrushin">
   <requires>
     <import addon="xbmc.python" version="2.1.0"/>

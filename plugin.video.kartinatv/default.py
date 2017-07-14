@@ -87,7 +87,11 @@ def list_channels(sid):
                 li.addStreamInfo('video', { 'codec':'h264' })
                 url = get_url(action='play', cid=channel.get('id'), sid=sid, arch=arch, gmt='-1')
                 xbmcplugin.addDirectoryItem(_handle, url, li, False)
-    xbmc.executebuiltin('Container.SetViewMode(51)')
+    skin_used = xbmc.getSkinDir()
+    if skin_used == 'skin.estuary':
+        xbmc.executebuiltin('Container.SetViewMode(55)')
+    else:
+        xbmc.executebuiltin('Container.SetViewMode(51)')
     xbmcplugin.endOfDirectory(_handle, cacheToDisc=False)
 
 def list_epg(sid, cid, date):
@@ -130,7 +134,10 @@ def list_epg(sid, cid, date):
         li.setInfo('video', info)
         url = get_url(action='play', cid=cid, sid=sid, arch=1, gmt=ut_start)
         xbmcplugin.addDirectoryItem(_handle, url, li, False)
-    xbmc.executebuiltin('Container.SetViewMode(51)')
+    if skin_used == 'skin.estuary':
+        xbmc.executebuiltin('Container.SetViewMode(55)')
+    else:
+        xbmc.executebuiltin('Container.SetViewMode(51)')
     xbmcplugin.endOfDirectory(_handle, cacheToDisc=False)
     xbmc.sleep(100)
     if found_index:

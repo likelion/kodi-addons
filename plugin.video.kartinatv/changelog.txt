@@ -1,3 +1,9 @@
+[B]1.0.3[/B]
+Better view support for Estuary skin
+
+[B]1.0.2[/B]
+Synced version with repository
+
 [B]1.0.1[/B]
 Added video library support
 
