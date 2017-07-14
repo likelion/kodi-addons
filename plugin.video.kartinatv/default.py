@@ -134,6 +134,7 @@ def list_epg(sid, cid, date):
         li.setInfo('video', info)
         url = get_url(action='play', cid=cid, sid=sid, arch=1, gmt=ut_start)
         xbmcplugin.addDirectoryItem(_handle, url, li, False)
+    skin_used = xbmc.getSkinDir()
     if skin_used == 'skin.estuary':
         xbmc.executebuiltin('Container.SetViewMode(55)')
     else:
