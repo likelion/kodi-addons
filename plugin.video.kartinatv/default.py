@@ -78,7 +78,7 @@ def list_channels(sid):
                         info['duration'] = channel.get('epg_end') - channel.get('epg_start')
                     li.setInfo('video', info)
                 color = group.get('color')[1:]
-                if color == 'ilver':
+                if color == '00008b':
                     color = 'efaf80'
                 color = 'ff%s'%color
                 li.setLabel('%s [COLOR white]%s[/COLOR][COLOR %s][B]%s[/B][/COLOR]%s'%(rec, start, color, channel.get('name'), program))
