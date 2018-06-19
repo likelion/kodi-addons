@@ -24,13 +24,15 @@ _handle = int(sys.argv[1])
 _api = 'http://iptv.kartina.tv/api/json/'
 _apis = 'https://iptv.kartina.tv/api/json/'
 _assets = 'http://anysta.kartina.tv/assets'
+colors = ['ffd8b1', '3cb44b', 'b13ed4', 'e6194b', 'ffe119', '0082c8', 'f58231', 'fabebe', '46f0f0', 'fffac8', 'e6beff',
+          'ffd8b1', '3cb44b', 'b13ed4', 'e6194b', 'ffe119', '0082c8', 'f58231', 'fabebe', '46f0f0', 'fffac8', 'e6beff' ]
 
 def get_setting(setting):
     return xbmcaddon.Addon().getSetting(setting)
 
 def api_call(api, sid, method, **kwargs):
     url = '%s%s?%s'%(api, method, urlencode(kwargs))
-    xbmc.log('URL = '+url)
+    xbmc.log('URL = '+url, xbmc.LOGNOTICE)
     req = urllib2.Request(url)
     if sid != None:
         req.add_header('Cookie', 'MW_SSID=%s'%sid)
@@ -50,7 +52,10 @@ def list_channels(sid):
     doc = api_call(_apis, sid, 'channel_list', show='all', protect_code=get_setting('protect'))
     if doc == None:
         return
+    colori = 0
     for group in doc.get('groups'):
+        color = 'ff%s'%colors[colori]
+        colori += 1
         for channel in group.get('channels'):
             if channel.get('is_video') == 1:
                 li = xbmcgui.ListItem()
@@ -77,10 +82,6 @@ def list_channels(sid):
                         start = '[[B]%s[/B]] '%datetime.datetime.fromtimestamp(channel.get('epg_start')).strftime('%H:%M')
                         info['duration'] = channel.get('epg_end') - channel.get('epg_start')
                     li.setInfo('video', info)
-                color = group.get('color')[1:]
-                if color == '00008b':
-                    color = 'efaf80'
-                color = 'ff%s'%color
                 li.setLabel('%s [COLOR white]%s[/COLOR][COLOR %s][B]%s[/B][/COLOR]%s'%(rec, start, color, channel.get('name'), program))
                 li.setArt({'thumb': channel.get('icon_link')})
                 li.setProperty('isPlayable', 'false')

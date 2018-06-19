@@ -1,3 +1,6 @@
+[B]1.0.5[/B]
+Replaced CSS colors with fixed ones
+
 [B]1.0.4[/B]
 Fixed color of the first channel group
 
