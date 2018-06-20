@@ -52,6 +52,7 @@ def list_channels(sid):
     doc = api_call(_apis, sid, 'channel_list', show='all', protect_code=get_setting('protect'))
     if doc == None:
         return
+    xbmcplugin.setContent(_handle, 'videos')
     colori = 0
     for group in doc.get('groups'):
         color = 'ff%s'%colors[colori]
@@ -98,6 +99,7 @@ def list_channels(sid):
 def list_epg(sid, cid, date):
     day = datetime.datetime.fromtimestamp(float(date))
     doc = api_call(_apis, sid, 'epg', cid=cid, day=day.strftime('%d%m%y'))
+    xbmcplugin.setContent(_handle, 'videos')
     if doc == None:
         return
     epg_min, epg_max = get_min_max(sid)
@@ -161,7 +163,7 @@ def vod_genres(sid):
 
 def vod_list(sid, id, page):
     doc = api_call(_apis, sid, 'vod_list', type='last', genre=id, page=page)
-    xbmcplugin.setContent(_handle, 'Movies')
+    xbmcplugin.setContent(_handle, 'movies')
     html = HTMLParser()
     for row in doc.get('rows'):
         url = get_url(action='vod_info', sid=sid, id=row.get('id'))
