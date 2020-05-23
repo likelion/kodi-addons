@@ -153,7 +153,7 @@ def list_epg(sid, cid, date):
         label = '[COLOR white][[B]%s[/B]][/COLOR] - %s'%(time.strftime('%H:%M', time.localtime(ut_start)), progname[0])
         li = xbmcgui.ListItem()
         li.addStreamInfo('video', { 'codec':'h264' })
-        li.setArt({'thumb': os.path.join(xbmcaddon.Addon().getAddonInfo('path'), 'icon.png')})
+        li.setArt({'thumb': get_channel_icon(cid)})
         if not found_index:
             if ut_start > st:
                 found_index = True
