@@ -26,4 +26,4 @@ do
         zip -r "$addon_name/$addon_name-$version.zip" "$addon_name" -x "*.zip"
 done
 
-python addons_xml_generator.py
+python2.7 addons_xml_generator.py

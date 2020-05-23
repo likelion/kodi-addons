@@ -13,6 +13,7 @@ import xbmc
 import xbmcaddon
 import xbmcgui
 import xbmcplugin
+import xbmcvfs
 import re
 import os
 import time
@@ -26,6 +27,9 @@ _apis = 'https://iptv.kartina.tv/api/json/'
 _assets = 'http://anysta.kartina.tv/assets'
 colors = ['ffd8b1', '3cb44b', 'b13ed4', 'e6194b', 'ffe119', '0082c8', 'f58231', 'fabebe', '46f0f0', 'fffac8', 'e6beff',
           'ffd8b1', '3cb44b', 'b13ed4', 'e6194b', 'ffe119', '0082c8', 'f58231', 'fabebe', '46f0f0', 'fffac8', 'e6beff' ]
+ID = xbmcaddon.Addon().getAddonInfo('id').decode("utf-8")
+DATA_PATH = xbmc.translatePath("special://profile/addon_data/%s" % ID).decode("utf-8")
+CACHE_PATH = os.path.join(DATA_PATH, "cache")
 
 def get_setting(setting):
     return xbmcaddon.Addon().getSetting(setting)
@@ -47,6 +51,30 @@ def api_call(api, sid, method, **kwargs):
 
 def get_url(**kwargs):
     return '%s?%s'%(_url, urlencode(kwargs))
+
+def get_channel_icon(channel):
+    path = '%s/%s.png'%(CACHE_PATH, channel)
+    if xbmcvfs.exists(path):
+      #xbmc.log('Found cached logo of channel %s'%(channel), xbmc.LOGNOTICE)
+      return path
+    else:
+      if not xbmcvfs.exists(CACHE_PATH):
+          xbmcvfs.mkdir(CACHE_PATH)
+      for i in range(9, 0, -1):
+          try:
+              uri = '%s/img/logo/comigo/1/%s.%s.png'%(_assets,channel,i)
+              response = urllib2.urlopen(uri)
+              xbmc.log('Found logo of channel %s = %s'%(channel, uri), xbmc.LOGNOTICE)
+              f = xbmcvfs.File(path, 'wb')
+              f.write(response.read())
+              f.close()
+              return path
+          except urllib2.HTTPError, e:
+              continue
+          except urllib2.URLError, e:
+              continue
+      xbmc.log('Could not find logo of channel %s'%channel, xbmc.LOGNOTICE)
+      return ''
 
 def list_channels(sid):
     doc = api_call(_apis, sid, 'channel_list', show='all', protect_code=get_setting('protect'))
@@ -84,7 +112,13 @@ def list_channels(sid):
                         info['duration'] = channel.get('epg_end') - channel.get('epg_start')
                     li.setInfo('video', info)
                 li.setLabel('%s [COLOR white]%s[/COLOR][COLOR %s][B]%s[/B][/COLOR]%s'%(rec, start, color, channel.get('name'), program))
-                li.setArt({'thumb': channel.get('icon_link')})
+                #li.setArt({'thumb': channel.get('icon_link')})
+                channel_icon = get_channel_icon(channel.get('id'))
+                if channel_icon != '':
+                    li.setArt({'thumb': channel_icon})
+                else:
+                    iname = re.search(r"/(\w+)\.gif", channel.get('icon'))
+                    li.setArt({'thumb': 'http://iptv.kartina.tv/img/logo/sml/1/%s.2.png'%(iname.group(1))})
                 li.setProperty('isPlayable', 'false')
                 li.addStreamInfo('video', { 'codec':'h264' })
                 url = get_url(action='play', cid=channel.get('id'), sid=sid, arch=arch, gmt='-1')
