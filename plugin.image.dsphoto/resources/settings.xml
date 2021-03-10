@@ -1,0 +1,9 @@
+<?xml version ="1.0" encoding="utf-8" standalone="yes"?>
+<settings>
+    <category label="General">
+        <setting id="host" type="text" label="Synology IP" default=""/>
+        <setting id="username" type="text" label="User" default=""/>
+        <setting id="password" type="text" label="Password" option="hidden" default=""/>
+        <setting id="page_limit" type="labelenum" label="Max per page" values="150|300|600" default="150" />
+    </category>
+</settings>
