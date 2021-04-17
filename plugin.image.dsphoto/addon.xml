@@ -16,6 +16,9 @@
     <description>
       Быстрое пролистывание и просмотр фотографий и видео из Synology Photo Station
     </description>
+    <assets>
+      <icon>icon.png</icon>
+    </assets>
     <platform>all</platform>
   </extension>
 </addon>

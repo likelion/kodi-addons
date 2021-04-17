@@ -12,6 +12,9 @@
 		<summary>Install Add-ons from Likelion Kodi Add-on Repository</summary>
 		<description>Addons for Kodi</description>
 		<disclaimer>Various useful Kodi add-ons</disclaimer>
+                <assets>
+   			<icon>icon.png</icon>
+    		</assets>
 		<platform>all</platform>
 	</extension>
 </addon>
