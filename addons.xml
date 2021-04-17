@@ -2,10 +2,10 @@
 <addons>
 <addon id="plugin.image.dsphoto"
        name="DS Photo"
-       version="1.0.0"
+       version="1.0.1"
        provider-name="Leonid Mokrushin">
   <requires>
-    <import addon="xbmc.python" version="2.1.0"/>
+    <import addon="xbmc.python" version="3.0.0"/>
   </requires>
   <extension point="xbmc.python.pluginsource"
              provides="image"

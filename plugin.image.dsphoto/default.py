@@ -6,7 +6,7 @@
 
 import sys, os
 import xbmcaddon, xbmcgui, xbmcplugin, xbmc
-import urllib, urllib2
+import urllib, urllib.parse, urllib.request
 import json
 
 __url__ = sys.argv[0]
@@ -32,54 +32,54 @@ class DsPhoto(xbmcgui.Window):
 
     def getAuth(self):
         url = 'http://' + self.host + path_auth
-        #print "[DEBUG] DSPHOTO: authorisation url " + url
-        values = dict(
-            username=self.username,
-            password=self.password,
-            api='SYNO.PhotoStation.Auth',
-            method='login',
-            version='1'
-        )
-        data = urllib.urlencode(values)
-        req = urllib2.Request(url, data)
+        values = {
+            'username': self.username,
+            'password': self.password,
+            'api': 'SYNO.PhotoStation.Auth',
+            'method': 'login',
+            'version': '1'
+        }
+        data = urllib.parse.urlencode(values)
+        data = data.encode('ascii')
+
+        req = urllib.request.Request(url, data)
         try:
-            rsp = urllib2.urlopen(req)
+            rsp = urllib.request.urlopen(req)
             content = rsp.read()
-            #print '[DSPHOTO] content: ' + content
             data = json.loads(content)
 
             self.sid = data['data']['sid']
             return True
-        except Exception, e:
+        except Exception as e:
             self.errorMessage = e
             return False
 
     def albumsList(self, parentAlbumId=None):
         url = 'http://' + self.host + path_album
-        values = dict(
-            sort_by='filename',
-            sort_direction='asc',
-            offset=self.offset,
-            limit=self.items_limit,
-            recursive='false',
-            api='SYNO.PhotoStation.Album',
-            method='list',
-            type='album,video,photo',
-            additional='album_permission,thumb_size,photo_exif,video_quality,video_codec,album_sorting',
-            version='1'
-        )
+        values = {
+            'sort_by': 'filename',
+            'sort_direction': 'asc',
+            'offset': self.offset,
+            'limit': self.items_limit,
+            'recursive': 'false',
+            'api': 'SYNO.PhotoStation.Album',
+            'method': 'list',
+            'type': 'album,video,photo',
+            'additional': 'album_permission,thumb_size,photo_exif,video_quality,video_codec,album_sorting',
+            'version': '1'
+        }
 
         if parentAlbumId is not None:
             values['id'] = parentAlbumId
 
-        data = urllib.urlencode(values)
+        data = urllib.parse.urlencode(values)
+        data = data.encode('ascii')
 
-        opener = urllib2.build_opener()
+        opener = urllib.request.build_opener()
         opener.addheaders.append(('Cookie', 'PHPSESSID='+self.sid))
         rsp = opener.open(url, data)
 
         content = rsp.read()
-        #print '[DSPHOTO] content: ' + content
         data = json.loads(content)
 
         listing = []
@@ -91,7 +91,8 @@ class DsPhoto(xbmcgui.Window):
             for item in data['data']['items']:
                 thumb = 'http://{0}{1}?api=SYNO.PhotoStation.Thumb&method=get&version=1&size=small&id={2}|Cookie=PHPSESSID={3};'.format(self.host, path_thumb, item['id'], self.sid)
 
-                list_item = xbmcgui.ListItem(item['info']['name'], '', thumbnailImage=thumb)
+                list_item = xbmcgui.ListItem(item['info']['name'], '')
+                list_item.setArt({'thumb': thumb})
 
                 if item['type'] == 'album':
                     item_url = '{0}?action=albums&albumid={1}&sid={2}'.format(__url__, item['id'], self.sid)
@@ -133,7 +134,6 @@ class DsPhoto(xbmcgui.Window):
         xbmc.Player().play(item_url, xbmcgui.ListItem(''))
 
     def handleRequest(self):
-        #print '[DSPHOTO] handle request: ' + sys.argv[2]
         self.parseParams()
 
         if 'page' in self.params:
@@ -141,7 +141,6 @@ class DsPhoto(xbmcgui.Window):
             self.offset = (self.items_limit * self.page) + 1
 
         if 'sid' in self.params:
-            #print '[DSPHOTO] we have sid in params'
             self.sid = self.params['sid']
 
         if len(self.sid) == 0:
@@ -171,13 +170,13 @@ class DsPhoto(xbmcgui.Window):
     def parseParams(self):
         if "=" in self.arguments:
             try:
-                self.params = dict()
+                self.params = {}
                 for x in self.arguments.split("&"):
                     elems = x.split("=")
                     if len(elems) == 2:
                         self.params[elems[0]] = elems[1]
             except:
-                print '[DSPHOTO] error in params: ' + self.arguments
+                print ('[DSPHOTO] error in params: ' + self.arguments)
 
     def getSetting(self, name):
         return xbmcplugin.getSetting(__handle__, name);
