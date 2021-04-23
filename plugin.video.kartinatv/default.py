@@ -101,12 +101,14 @@ def list_channels(sid):
                 li.addContextMenuItems(menu)
                 start = ' [B]--------[/B]  '
                 program = ''
+                plot = ''
                 if 'epg_progname' in channel:
                     progname = channel.get('epg_progname').splitlines()
                     program = ' - ' + progname[0]
                     info = {'title': progname[0]}
                     if len(progname) > 1:
-                        info['plot'] = ' '.join(progname[1:])
+                        plot = ' '.join(progname[1:])
+                        info['plot'] = plot
                     if 'epg_start' in channel and 'epg_end' in channel:
                         start = '[[B]%s[/B]] '%datetime.datetime.fromtimestamp(channel.get('epg_start')).strftime('%H:%M')
                         info['duration'] = channel.get('epg_end') - channel.get('epg_start')
@@ -120,8 +122,7 @@ def list_channels(sid):
                     iname = re.search(r"/(\w+)\.gif", channel.get('icon'))
                     li.setArt({'thumb': 'http://iptv.kartina.tv/img/logo/sml/1/%s.2.png'%(iname.group(1))})
                 li.setProperty('isPlayable', 'false')
-                li.addStreamInfo('video', { 'codec':'h264' })
-                url = get_url(action='play', cid=channel.get('id'), sid=sid, arch=arch, gmt='-1')
+                url = get_url(action='play', cid=channel.get('id'), name=progname[0], plot=plot, sid=sid, arch=arch, gmt='-1')
                 xbmcplugin.addDirectoryItem(_handle, url, li, False)
     skin_used = xbmc.getSkinDir()
     if skin_used == 'skin.estuary':
@@ -152,7 +153,6 @@ def list_epg(sid, cid, date):
         progname = epg.get('progname').splitlines()
         label = '[COLOR white][[B]%s[/B]][/COLOR] - %s'%(time.strftime('%H:%M', time.localtime(ut_start)), progname[0])
         li = xbmcgui.ListItem()
-        li.addStreamInfo('video', { 'codec':'h264' })
         li.setArt({'thumb': get_channel_icon(cid)})
         if not found_index:
             if ut_start > st:
@@ -165,11 +165,12 @@ def list_epg(sid, cid, date):
             label = '[I]%s[/I]'%label
         li.setProperty('isPlayable', 'false')
         li.setLabel(label)
-        info = {'title': progname[0]}
         if len(progname) > 1:
-            info['plot'] = ' '.join(progname[1:])
-        li.setInfo('video', info)
-        url = get_url(action='play', cid=cid, sid=sid, arch=1, gmt=ut_start)
+            plot = ' '.join(progname[1:])
+        else:
+            plot = ''
+        li.setInfo('video', {'title': progname[0], 'plot': plot})
+        url = get_url(action='play', cid=cid, name=progname[0], plot=plot, sid=sid, arch=1, gmt=ut_start)
         xbmcplugin.addDirectoryItem(_handle, url, li, False)
     skin_used = xbmc.getSkinDir()
     if skin_used == 'skin.estuary':
@@ -262,76 +263,25 @@ def get_min_max(sid):
     min = max - catchup.get('length')
     return (min, max)
 
-closescript = False
-
-class MyMonitor(xbmc.Monitor):
-
-    def __init__ (self):
-        xbmc.Monitor.__init__(self)
-
-    def onAbortRequested(self):
-        global closescript
-        closescript = True
-
-class MyPlayer(xbmc.Player):
-
-    def __init__ (self, sid, cid, arch, gmt):
-        xbmc.Player.__init__(self)
-        self.sid = sid
-        self.cid = cid
-        self.arch = arch
-        self.gmt = int(gmt)
-        self.max = -1
-        self.min = -1
-
-    def play_channel(self):
-        if self.gmt ==  -1:
-            doc = api_call(_apis, self.sid, 'get_url', cid=self.cid, protect_code=get_setting('protect'))
-        else:
-            doc = api_call(_apis, self.sid, 'get_url', cid=self.cid, gmt=self.gmt, protect_code=get_setting('protect'))
-        if doc == None:
-            return
-        url = doc.get('url')
-        url = re.sub('http/ts(.*?)\s(.*)', 'http\\1', url)
-        s = time.strftime('%d %b %H:%M', time.localtime(self.gmt))
-        i = time.strftime('%d %b %H:%M', time.localtime(self.min))
-        self.li = xbmcgui.ListItem('%s / %s'%(s,i))
-        self.play(url, self.li)
-
-    def onPlayBackStopped(self):
-        global closescript
-        closescript = True
-
-    def onPlayBackSeek(self, time, seekOffset):
-        if self.arch == '1' and not (self.gmt == -1 and seekOffset >= 0):
-            self.pause()
-            self.min, self.max = get_min_max(self.sid)
-            if self.min == None or self.max == None:
-                self.stop()
-                return
-            if self.gmt == -1:
-                self.gmt = self.max
-            self.gmt = self.gmt + int(self.getTime()) + int(seekOffset/1000)
-            if self.gmt < self.min:
-                self.gmt = self.min
-            elif self.gmt > self.max:
-                self.gmt = -1
-            self.play_channel()
-
-def play_video(sid, cid, arch, gmt):
-    monitor = MyMonitor()
-    player = MyPlayer(sid=sid, cid=cid, arch=arch, gmt=gmt)
-    player.play_channel()
-    while not ( closescript ):
-        #if player.isPlaying():
-        #    xbmc.log('--- '+str(player.gmt)+' '+str(player.getTime()))
-        xbmc.sleep(500)
+def play_video(sid, cid, name, plot, arch, gmt):
+    if int(gmt) ==  -1:
+        doc = api_call(_apis, sid, 'get_url', cid=cid, protect_code=get_setting('protect'))
+    else:
+        doc = api_call(_apis, sid, 'get_url', cid=cid, gmt=gmt, protect_code=get_setting('protect'))
+    if doc == None:
+        return
+    url = doc.get('url')
+    url = re.sub('http/ts(.*?)\s(.*)', 'http\\1', url)
+    li = xbmcgui.ListItem(label=name)
+    li.setArt({'thumb': get_channel_icon(cid)})
+    li.setInfo('video', {'title': name, 'plot': plot})
+    xbmc.Player().play(url, li)
 
 def router(paramstring):
     params = dict(parse_qsl(paramstring))
     if params:
         if params['action'] == 'play':
-            play_video(params['sid'], params['cid'], params['arch'], params['gmt'])
+            play_video(params['sid'], params['cid'], params['name'], params['plot'], params['arch'], params['gmt'])
         elif params['action'] == 'epg':
             list_epg(params['sid'], params['cid'], params['date'])
         elif params['action'] == 'vod_genres':
