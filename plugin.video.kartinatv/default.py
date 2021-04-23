@@ -5,9 +5,9 @@
 # License: GPL v.3 https://www.gnu.org/copyleft/gpl.html
 
 import sys
-from urllib import urlencode, quote, unquote
-from urlparse import parse_qsl
-import urllib2
+from urllib.parse import urlencode, quote, unquote, parse_qsl
+from urllib.error import URLError, HTTPError
+import urllib.request 
 import json
 import xbmc
 import xbmcaddon
@@ -18,7 +18,7 @@ import re
 import os
 import time
 import datetime
-from HTMLParser import HTMLParser
+from html.parser import HTMLParser
 
 _url = sys.argv[0]
 _handle = int(sys.argv[1])
@@ -27,8 +27,8 @@ _apis = 'https://iptv.kartina.tv/api/json/'
 _assets = 'http://anysta.kartina.tv/assets'
 colors = ['ffd8b1', '3cb44b', 'b13ed4', 'e6194b', 'ffe119', '0082c8', 'f58231', 'fabebe', '46f0f0', 'fffac8', 'e6beff',
           'ffd8b1', '3cb44b', 'b13ed4', 'e6194b', 'ffe119', '0082c8', 'f58231', 'fabebe', '46f0f0', 'fffac8', 'e6beff' ]
-ID = xbmcaddon.Addon().getAddonInfo('id').decode("utf-8")
-DATA_PATH = xbmc.translatePath("special://profile/addon_data/%s" % ID).decode("utf-8")
+ID = xbmcaddon.Addon().getAddonInfo('id')
+DATA_PATH = xbmcvfs.translatePath("special://profile/addon_data/%s" % ID)
 CACHE_PATH = os.path.join(DATA_PATH, "cache")
 
 def get_setting(setting):
@@ -36,16 +36,16 @@ def get_setting(setting):
 
 def api_call(api, sid, method, **kwargs):
     url = '%s%s?%s'%(api, method, urlencode(kwargs))
-    xbmc.log('URL = '+url, xbmc.LOGNOTICE)
-    req = urllib2.Request(url)
+    xbmc.log('URL = '+url, xbmc.LOGDEBUG)
+    req = urllib.request.Request(url)
     if sid != None:
         req.add_header('Cookie', 'MW_SSID=%s'%sid)
-    res = urllib2.urlopen(req)
+    res = urllib.request.urlopen(req)
     body = res.read()
     doc = json.loads(body)
     res.close()
     if 'error' in doc:
-        xbmc.executebuiltin('XBMC.Notification(KartinaTV, %s, 5000)' % doc.get('error').get('message'))
+        xbmc.executebuiltin('Notification(KartinaTV, %s, 5000)' % doc.get('error').get('message'))
         return None
     return doc
 
@@ -55,7 +55,7 @@ def get_url(**kwargs):
 def get_channel_icon(channel):
     path = '%s/%s.png'%(CACHE_PATH, channel)
     if xbmcvfs.exists(path):
-      #xbmc.log('Found cached logo of channel %s'%(channel), xbmc.LOGNOTICE)
+      #xbmc.log('Found cached logo of channel %s'%(channel), xbmc.LOGDEBUG)
       return path
     else:
       if not xbmcvfs.exists(CACHE_PATH):
@@ -63,17 +63,17 @@ def get_channel_icon(channel):
       for i in range(9, 0, -1):
           try:
               uri = '%s/img/logo/comigo/1/%s.%s.png'%(_assets,channel,i)
-              response = urllib2.urlopen(uri)
-              xbmc.log('Found logo of channel %s = %s'%(channel, uri), xbmc.LOGNOTICE)
+              response = urllib.request.urlopen(uri)
+              xbmc.log('Found logo of channel %s = %s'%(channel, uri), xbmc.LOGDEBUG)
               f = xbmcvfs.File(path, 'wb')
               f.write(response.read())
               f.close()
               return path
-          except urllib2.HTTPError, e:
+          except HTTPError as e:
               continue
-          except urllib2.URLError, e:
+          except URLError as e:
               continue
-      xbmc.log('Could not find logo of channel %s'%channel, xbmc.LOGNOTICE)
+      xbmc.log('Could not find logo of channel %s'%channel, xbmc.LOGINFO)
       return ''
 
 def list_channels(sid):
@@ -93,12 +93,12 @@ def list_channels(sid):
                 if arch == 1:
                     rec = '[COLOR red]%s[/COLOR]'%u'\u2022'
                     url = get_url(action='epg', cid=channel.get('id'), sid=sid, date=time.time())
-                    menu.append(('Archive','XBMC.Container.Update(%s)'%url))
+                    menu.append(('Archive','Container.Update(%s)'%url))
                 else:
                     rec = '[COLOR gray]%s[/COLOR]'%u'\u2022'
                 url = get_url(action='vod_genres', sid=sid)
-                menu.append(('Video library', 'XBMC.Container.Update(%s)'%url))
-                li.addContextMenuItems(menu, replaceItems=True)
+                menu.append(('Video library', 'Container.Update(%s)'%url))
+                li.addContextMenuItems(menu)
                 start = ' [B]--------[/B]  '
                 program = ''
                 if 'epg_progname' in channel:
@@ -341,7 +341,7 @@ def router(paramstring):
         elif params['action'] == 'vod_info':
             vod_info(params['sid'], params['id'])
         else:
-            xbmc.executebuiltin('XBMC.Notification(KartinaTV, Invalid paramstring: %s, 5000)' % paramstring)
+            xbmc.executebuiltin('Notification(KartinaTV, Invalid paramstring: %s, 5000)' % paramstring)
     else:
         doc = api_call(_apis, None, 'login', **{'login': get_setting('username'), 'pass': get_setting('password')})
         if doc == None:

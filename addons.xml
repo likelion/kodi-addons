@@ -26,10 +26,10 @@
 
 <addon id="plugin.video.kartinatv"
        name="KartinaTV"
-       version="1.0.8"
+       version="1.0.9"
        provider-name="Leonid Mokrushin">
   <requires>
-    <import addon="xbmc.python" version="2.1.0"/>
+    <import addon="xbmc.python" version="3.0.0"/>
   </requires>
   <extension point="xbmc.python.pluginsource"
              provides="video"
@@ -41,13 +41,16 @@
     <description>
       Интернет-телевидение в любой точке мира: более 150 каналов, видеотека, архив, мультирум
     </description>
+    <assets>
+      <icon>icon.png</icon>
+    </assets>
     <platform>all</platform>
   </extension>
 </addon>
 
 <addon id="repository.likelion"
        name="Likelion Kodi Add-ons"
-       version="1.0.3"
+       version="1.0.4"
        provider-name="Leonid Mokrushin">
 	<extension point="xbmc.addon.repository" name="Likelion Kodi Add-ons">
 		<info compressed="false">https://raw.githubusercontent.com/likelion/kodi-addons/master/addons.xml</info>
