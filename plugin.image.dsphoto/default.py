@@ -2,7 +2,7 @@
 # Module: default
 # Author: Leonid Mokrushin
 # Created on: 10.03.2021
-# License: GPL v.3 https://www.gnu.org/copyleft/gpl.html
+# License: GPL v.3 http://www.gnu.org/copyleft/gpl.html
 
 import sys, os
 import xbmcaddon, xbmcgui, xbmcplugin, xbmc
@@ -12,10 +12,9 @@ import json
 __url__ = sys.argv[0]
 __handle__ = int(sys.argv[1])
 
-path_auth = '/photo/webapi/auth.php'
-path_album = '/photo/webapi/album.php'
-path_thumb = '/photo/webapi/thumb.php'
-path_download = '/photo/webapi/download.php'
+path_auth = '/photo/webapi/auth.cgi'
+path_entry = '/photo/webapi/entry.cgi'
+path_thumb = '/photo/mo/sharing/webapi/entry.cgi'
 
 class DsPhoto(xbmcgui.Window):
     def __init__(self):
@@ -28,16 +27,17 @@ class DsPhoto(xbmcgui.Window):
         self.sid = ''
         self.offset = 0
         self.page = 0
+        self.prefix = 1
         self.errorMessage = ''
 
     def getAuth(self):
         url = 'http://' + self.host + path_auth
         values = {
-            'username': self.username,
-            'password': self.password,
-            'api': 'SYNO.PhotoStation.Auth',
+            'account': self.username,
+            'passwd': self.password,
+            'api': 'SYNO.API.Auth',
             'method': 'login',
-            'version': '1'
+            'version': '3'
         }
         data = urllib.parse.urlencode(values)
         data = data.encode('ascii')
@@ -47,82 +47,100 @@ class DsPhoto(xbmcgui.Window):
             rsp = urllib.request.urlopen(req)
             content = rsp.read()
             data = json.loads(content)
-
             self.sid = data['data']['sid']
             return True
         except Exception as e:
             self.errorMessage = e
             return False
 
-    def albumsList(self, parentAlbumId=None):
-        url = 'http://' + self.host + path_album
+    def albumsList(self, parentAlbumId='1'):
+        listing = []
+        url = 'http://' + self.host + path_entry
+
+        # folders in the folder
         values = {
-            'sort_by': 'filename',
-            'sort_direction': 'asc',
+            'api': 'SYNO.FotoTeam.Browse.Folder',
+            'method': 'list',
+            'id': parentAlbumId,
             'offset': self.offset,
             'limit': self.items_limit,
-            'recursive': 'false',
-            'api': 'SYNO.PhotoStation.Album',
-            'method': 'list',
-            'type': 'album,video,photo',
-            'additional': 'album_permission,thumb_size,photo_exif,video_quality,video_codec,album_sorting',
             'version': '1'
         }
-
-        if parentAlbumId is not None:
-            values['id'] = parentAlbumId
 
         data = urllib.parse.urlencode(values)
         data = data.encode('ascii')
 
         opener = urllib.request.build_opener()
-        opener.addheaders.append(('Cookie', 'PHPSESSID='+self.sid))
+        opener.addheaders.append(('Cookie', 'id='+self.sid))
         rsp = opener.open(url, data)
 
         content = rsp.read()
         data = json.loads(content)
 
-        listing = []
+        if data['success']:
+            for item in data['data']['list']:
+                list_item = xbmcgui.ListItem(item['name'][self.prefix:], '')
+                item_url = '{0}?action=albums&albumid={1}&sid={2}&prefix={3}'.format(__url__, item['id'], self.sid, len(item['name'])+1)
+                listing.append((item_url, list_item, True))
+
+        # items in the folder
+        values = {
+            'api': 'SYNO.FotoTeam.Browse.Item',
+            'method': 'list',
+            'folder_id': parentAlbumId,
+            'offset': self.offset,
+            'limit': self.items_limit,
+            'version': '1',
+            'additional': '["thumbnail"]',
+            'sort_direction': 'asc'
+        }
+
+        data = urllib.parse.urlencode(values)
+        data = data.encode('ascii')
+
+        opener = urllib.request.build_opener()
+        opener.addheaders.append(('Cookie', 'id='+self.sid))
+        rsp = opener.open(url, data)
+
+        content = rsp.read()
+        data = json.loads(content)
 
         if data['success']:
-            total = data['data']['total']
-            offset = data['data']['offset']
-
-            for item in data['data']['items']:
-                thumb = 'http://{0}{1}?api=SYNO.PhotoStation.Thumb&method=get&version=1&size=small&id={2}|Cookie=PHPSESSID={3};'.format(self.host, path_thumb, item['id'], self.sid)
-
-                list_item = xbmcgui.ListItem(item['info']['name'], '')
+            for item in data['data']['list']:
+                thumb = 'http://{0}{1}?api=SYNO.FotoTeam.Thumbnail&method=get&version=1&size=sm&id={2}&cache_key={3}&type=unit|Cookie=id={4};'.format(self.host, path_thumb, item['id'], item['additional']['thumbnail']['cache_key'], self.sid)
+                list_item = xbmcgui.ListItem(item['filename'], '')
+                item_url = '{0}?action=albums&albumid={1}&sid={2}'.format(__url__, item['id'], self.sid)
                 list_item.setArt({'thumb': thumb})
 
-                if item['type'] == 'album':
-                    item_url = '{0}?action=albums&albumid={1}&sid={2}'.format(__url__, item['id'], self.sid)
-                    is_folder = True
+                # if item['type'] == 'album':
+                #     item_url = '{0}?action=albums&albumid={1}&sid={2}'.format(__url__, item['id'], self.sid)
+                #     is_folder = True
 
-                elif item['type'] == 'photo':
-                    item_url = 'http://{0}{1}?api=SYNO.PhotoStation.Thumb&method=get&version=1&size=large&id={2}|Cookie=PHPSESSID={3};'.format(self.host, path_thumb, item['id'], self.sid)
-                    is_folder = False
-                    list_item.setInfo(type='picture', infoLabels={'Title': item['info']['title']})
-                    list_item.setMimeType('image/{0}'.format(item['info']['name'].split(".")[-1]))
+                # elif item['type'] == 'photo':
+                #     item_url = 'http://{0}{1}?api=SYNO.PhotoStation.Thumb&method=get&version=1&size=large&id={2}|Cookie=PHPSESSID={3};'.format(self.host, path_thumb, item['id'], self.sid)
+                #     is_folder = False
+                #     list_item.setInfo(type='picture', infoLabels={'Title': item['info']['title']})
+                #     list_item.setMimeType('image/{0}'.format(item['info']['name'].split(".")[-1]))
 
-                elif item['type'] == 'video':
-                    item_url = '{0}?action=video&videoid={1}&qualityid={2}&sid={3}'.format(__url__, item['id'], item['additional']['video_quality'][0]['id'], self.sid)
-                    is_folder = True
-                    container = item['additional']['video_codec']['container']
-                    list_item.setLabel('{0} ({1})'.format(item['info']['name'], container))
-                    list_item.setInfo(type='video', infoLabels={'Title': item['info']['title']})
-                    list_item.setMimeType('video/{0}'.format(container))
+                # elif item['type'] == 'video':
+                #     item_url = '{0}?action=video&videoid={1}&qualityid={2}&sid={3}'.format(__url__, item['id'], item['additional']['video_quality'][0]['id'], self.sid)
+                #     is_folder = True
+                #     container = item['additional']['video_codec']['container']
+                #     list_item.setLabel('{0} ({1})'.format(item['info']['name'], container))
+                #     list_item.setInfo(type='video', infoLabels={'Title': item['info']['title']})
+                #     list_item.setMimeType('video/{0}'.format(container))
 
-                else:
-                    item_url = ''
-                    is_folder = False
+                # else:
+                #     item_url = ''
+                #     is_folder = False
 
-                listing.append((item_url, list_item, is_folder))
+                listing.append((item_url, list_item, False))
 
-            if int(total) > int(offset):
-                item_url = '{0}?action=albums&albumid={1}&sid={2}&page={3}'.format(__url__, parentAlbumId, self.sid, str(self.page + 1))
-                list_item = xbmcgui.ListItem('Next page')
-                is_folder = True
-                listing.append((item_url, list_item, is_folder))
+            # if int(total) > int(offset):
+            #     item_url = '{0}?action=albums&albumid={1}&sid={2}&page={3}'.format(__url__, parentAlbumId, self.sid, str(self.page + 1))
+            #     list_item = xbmcgui.ListItem('Next page')
+            #     is_folder = True
+            #     listing.append((item_url, list_item, is_folder))
 
             xbmcplugin.setContent(__handle__, 'images')
             xbmcplugin.addDirectoryItems(__handle__, listing, len(listing))
@@ -142,6 +160,9 @@ class DsPhoto(xbmcgui.Window):
 
         if 'sid' in self.params:
             self.sid = self.params['sid']
+
+        if 'prefix' in self.params:
+            self.prefix = int(self.params['prefix'])
 
         if len(self.sid) == 0:
             if self.host and not self.getAuth():
