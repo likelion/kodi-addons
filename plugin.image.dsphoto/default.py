@@ -64,7 +64,9 @@ class DsPhoto(xbmcgui.Window):
             'id': parentAlbumId,
             'offset': self.offset,
             'limit': self.items_limit,
-            'version': '1'
+            'version': '2',
+            'additional': '["thumbnail"]',
+            'sort_direction': 'asc'
         }
 
         data = urllib.parse.urlencode(values)
@@ -81,6 +83,18 @@ class DsPhoto(xbmcgui.Window):
             for item in data['data']['list']:
                 list_item = xbmcgui.ListItem(item['name'][self.prefix:], '')
                 item_url = '{0}?action=albums&albumid={1}&sid={2}&prefix={3}'.format(__url__, item['id'], self.sid, len(item['name'])+1)
+
+                if 'additional' in item:
+                    if 'thumbnail' in item['additional']:
+                        thumbnail = item['additional']['thumbnail']
+                        if len(thumbnail) > 0:
+                            tnail = thumbnail[0]
+                            if 'sm' in tnail:
+                                thumb = 'http://{0}{1}?api=SYNO.FotoTeam.Thumbnail&method=get&version=1&id={2}&cache_key={3}&type=unit&size=sm|Cookie=id={4};'.format(self.host, path_thumb, tnail['unit_id'], tnail['cache_key'], self.sid)
+                            else:
+                                thumb = 'http://{0}{1}?api=SYNO.FotoTeam.Thumbnail&method=get&version=2&id={2}&cache_key={3}_{4}&type=folder&folder_cover_seq=0|Cookie=id={5};'.format(self.host, path_thumb, item['id'], item['id'], tnail['cache_key'], self.sid)
+                            list_item.setArt({'thumb': thumb})
+
                 listing.append((item_url, list_item, True))
 
         # items in the folder
@@ -107,34 +121,21 @@ class DsPhoto(xbmcgui.Window):
 
         if data['success']:
             for item in data['data']['list']:
-                thumb = 'http://{0}{1}?api=SYNO.FotoTeam.Thumbnail&method=get&version=1&size=sm&id={2}&cache_key={3}&type=unit|Cookie=id={4};'.format(self.host, path_thumb, item['id'], item['additional']['thumbnail']['cache_key'], self.sid)
-                list_item = xbmcgui.ListItem(item['filename'], '')
-                item_url = '{0}?action=albums&albumid={1}&sid={2}'.format(__url__, item['id'], self.sid)
-                list_item.setArt({'thumb': thumb})
+                if item['type'] == 'photo':
+                    thumb = 'http://{0}{1}?api=SYNO.FotoTeam.Thumbnail&method=get&version=1&size=sm&id={2}&cache_key={3}&type=unit|Cookie=id={4};'.format(self.host, path_thumb, item['id'], item['additional']['thumbnail']['cache_key'], self.sid)
+                    list_item = xbmcgui.ListItem(item['filename'].split(".")[0], '')
+                    list_item.setMimeType('image/{0}'.format(item['filename'].split(".")[-1]))
+                    item_url = 'http://{0}{1}?api=SYNO.FotoTeam.Thumbnail&method=get&version=1&size=xl&id={2}&cache_key={3}&type=unit|Cookie=id={4};'.format(self.host, path_thumb, item['id'], item['additional']['thumbnail']['cache_key'], self.sid)
+                    list_item.setArt({'thumb': thumb})
+                    listing.append((item_url, list_item, False))
 
-                # if item['type'] == 'album':
-                #     item_url = '{0}?action=albums&albumid={1}&sid={2}'.format(__url__, item['id'], self.sid)
-                #     is_folder = True
-
-                # elif item['type'] == 'photo':
-                #     item_url = 'http://{0}{1}?api=SYNO.PhotoStation.Thumb&method=get&version=1&size=large&id={2}|Cookie=PHPSESSID={3};'.format(self.host, path_thumb, item['id'], self.sid)
-                #     is_folder = False
-                #     list_item.setInfo(type='picture', infoLabels={'Title': item['info']['title']})
-                #     list_item.setMimeType('image/{0}'.format(item['info']['name'].split(".")[-1]))
-
-                # elif item['type'] == 'video':
-                #     item_url = '{0}?action=video&videoid={1}&qualityid={2}&sid={3}'.format(__url__, item['id'], item['additional']['video_quality'][0]['id'], self.sid)
-                #     is_folder = True
-                #     container = item['additional']['video_codec']['container']
-                #     list_item.setLabel('{0} ({1})'.format(item['info']['name'], container))
-                #     list_item.setInfo(type='video', infoLabels={'Title': item['info']['title']})
-                #     list_item.setMimeType('video/{0}'.format(container))
-
-                # else:
-                #     item_url = ''
-                #     is_folder = False
-
-                listing.append((item_url, list_item, False))
+                elif item['type'] == 'video':
+                    thumb = 'http://{0}{1}?api=SYNO.FotoTeam.Thumbnail&method=get&version=1&size=sm&id={2}&cache_key={3}&type=unit|Cookie=id={4};'.format(self.host, path_thumb, item['id'], item['additional']['thumbnail']['cache_key'], self.sid)
+                    list_item = xbmcgui.ListItem(item['filename'].split(".")[0], '')
+                    list_item.setMimeType('video/{0}'.format(item['filename'].split(".")[-1]))
+                    item_url = '{0}?action=video&videoid={1}&sid={2}'.format(__url__, item['id'], self.sid)
+                    list_item.setArt({'thumb': thumb})
+                    listing.append((item_url, list_item, True))
 
             # if int(total) > int(offset):
             #     item_url = '{0}?action=albums&albumid={1}&sid={2}&page={3}'.format(__url__, parentAlbumId, self.sid, str(self.page + 1))
@@ -147,8 +148,8 @@ class DsPhoto(xbmcgui.Window):
             xbmc.executebuiltin('Container.SetViewMode(500)')
             xbmcplugin.endOfDirectory(__handle__, cacheToDisc=False)
 
-    def showVideo(self, videoId=None, qualityId=None):
-        item_url = 'http://{0}{1}?api=SYNO.PhotoStation.Download&method=getvideo&version=1&id={2}&quality_id={3}&use_mov=true|Cookie=PHPSESSID={4};'.format(self.host, path_download, videoId, qualityId, self.sid)
+    def showVideo(self, videoId=None):
+        item_url = 'http://{0}{1}?api=SYNO.FotoTeam.Download&method=download&version=2&item_id=[{2}]|Cookie=id={3};'.format(self.host, path_entry, videoId, self.sid)
         xbmc.Player().play(item_url, xbmcgui.ListItem(''))
 
     def handleRequest(self):
@@ -181,9 +182,7 @@ class DsPhoto(xbmcgui.Window):
             if self.params['action'] == 'video':
                 if 'videoid' in self.params:
                     videoId = self.params['videoid']
-                if 'qualityid' in self.params:
-                    qualityId = self.params['qualityid']
-                self.showVideo(videoId, qualityId)
+                self.showVideo(videoId)
 
         else:
             self.albumsList()

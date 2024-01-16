@@ -1,0 +1,25 @@
+### apis
+GET https://192.168.2.7/photo/webapi/entry.cgi?api=SYNO.API.Info&version=1&method=query&query=all HTTP/1.1
+
+### login
+GET http://192.168.2.7/photo/webapi/auth.cgi?api=SYNO.API.Auth&version=3&method=login&account=admin&passwd=<xxx>HTTP/1.1
+
+### get list of folders
+GET http://192.168.2.7/photo/webapi/entry.cgi?api=SYNO.FotoTeam.Browse.Folder&version=1&method=list_parents HTTP/1.1
+
+### get list of subfolders of {id} folder
+GET http://192.168.2.7/photo/webapi/entry.cgi?api=SYNO.FotoTeam.Browse.Folder&version=2&method=list&offset=0&limit=100&id=1081&additional=["thumbnail"] HTTP/1.1
+
+### get folder thumbnail
+GET http://192.168.2.7/photo/webapi/entry.cgi?api=SYNO.FotoTeam.Thumbnail&version=2&method=get&id=80&cache_key=80_1705353385&type=folder&folder_cover_seq=0 HTTP/1.1
+
+### get list of items in folder {folder_id}
+GET http://192.168.2.7/photo/webapi/entry.cgi?api=SYNO.FotoTeam.Browse.Item&version=1&method=list&offset=0&limit=100&folder_id=1082&additional=["thumbnail"]&sort_direction=asc HTTP/1.1
+
+### get item for {id, additional/cache_key}
+GET http://192.168.2.7/photo/webapi/entry.cgi?api=SYNO.FotoTeam.Thumbnail&method=get&version=1&id=29566&cache_key=29566_1705098468&type=unit&size=xl HTTP/1.1
+
+### get video
+GET http://192.168.2.7/photo/webapi/entry.cgi?api=SYNO.FotoTeam.Download&method=download&version=2&item_id=[29565] HTTP/1.1
+
+
