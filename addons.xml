@@ -2,7 +2,7 @@
 <addons>
 <addon id="plugin.image.dsphoto"
        name="DS Photo"
-       version="1.0.1"
+       version="1.1.0"
        provider-name="Leonid Mokrushin">
   <requires>
     <import addon="xbmc.python" version="3.0.0"/>
@@ -13,9 +13,9 @@
     <provides>image</provides>
   </extension>
   <extension point="xbmc.addon.metadata">
-    <summary>Провайдер контента из Synology Photo Station</summary>
+    <summary>Провайдер контента из Synology Photos</summary>
     <description>
-      Быстрое пролистывание и просмотр фотографий и видео из Synology Photo Station
+      Быстрое пролистывание и просмотр фотографий и видео из Synology Photos
     </description>
     <assets>
       <icon>icon.png</icon>
@@ -50,7 +50,7 @@
 
 <addon id="repository.likelion"
        name="Likelion Kodi Add-ons"
-       version="1.0.4"
+       version="1.0.5"
        provider-name="Leonid Mokrushin">
 	<extension point="xbmc.addon.repository" name="Likelion Kodi Add-ons">
 		<info compressed="false">https://raw.githubusercontent.com/likelion/kodi-addons/master/addons.xml</info>
