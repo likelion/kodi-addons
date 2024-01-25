@@ -2,10 +2,10 @@
 # Module: default
 # Author: Leonid Mokrushin
 # Created on: 10.03.2021
-# License: GPL v.3 http://www.gnu.org/copyleft/gpl.html
+# License: GPL v.3 https://www.gnu.org/copyleft/gpl.html
 
-import sys, os
-import xbmcaddon, xbmcgui, xbmcplugin, xbmc
+import sys, math
+import xbmcgui, xbmcplugin, xbmc
 import urllib, urllib.parse, urllib.request
 import json
 
@@ -62,8 +62,8 @@ class DsPhoto(xbmcgui.Window):
             'api': 'SYNO.FotoTeam.Browse.Folder',
             'method': 'list',
             'id': parentAlbumId,
-            'offset': self.offset,
-            'limit': self.items_limit,
+            'offset': 0,
+            'limit': 1000,
             'version': '2',
             'additional': '["thumbnail"]',
             'sort_direction': 'asc'
@@ -96,6 +96,29 @@ class DsPhoto(xbmcgui.Window):
                             list_item.setArt({'thumb': thumb})
 
                 listing.append((item_url, list_item, True))
+
+
+        values = {
+            'api': 'SYNO.FotoTeam.Browse.Item',
+            'method': 'count',
+            'folder_id': parentAlbumId,
+            'version': '1'
+        }
+
+        data = urllib.parse.urlencode(values)
+        data = data.encode('ascii')
+
+        opener = urllib.request.build_opener()
+        opener.addheaders.append(('Cookie', 'id='+self.sid))
+        rsp = opener.open(url, data)
+
+        content = rsp.read()
+        data = json.loads(content)
+
+        if data['success']:
+            total = data['data']['count']
+        else:
+            total = -1
 
         # items in the folder
         values = {
@@ -137,11 +160,10 @@ class DsPhoto(xbmcgui.Window):
                     list_item.setArt({'thumb': thumb})
                     listing.append((item_url, list_item, True))
 
-            # if int(total) > int(offset):
-            #     item_url = '{0}?action=albums&albumid={1}&sid={2}&page={3}'.format(__url__, parentAlbumId, self.sid, str(self.page + 1))
-            #     list_item = xbmcgui.ListItem('Next page')
-            #     is_folder = True
-            #     listing.append((item_url, list_item, is_folder))
+            if total > self.offset + len(data['data']['list']):
+                item_url = '{0}?action=albums&albumid={1}&sid={2}&prefix={3}&page={4}'.format(__url__, parentAlbumId, self.sid, self.prefix, str(self.page + 1))
+                list_item = xbmcgui.ListItem('Next page ('+str(self.page + 2)+'/'+str(math.ceil(total/self.items_limit))+')')
+                listing.append((item_url, list_item, True))
 
             xbmcplugin.setContent(__handle__, 'images')
             xbmcplugin.addDirectoryItems(__handle__, listing, len(listing))
@@ -157,7 +179,7 @@ class DsPhoto(xbmcgui.Window):
 
         if 'page' in self.params:
             self.page = int(self.params['page'])
-            self.offset = (self.items_limit * self.page) + 1
+            self.offset = (self.items_limit * self.page)
 
         if 'sid' in self.params:
             self.sid = self.params['sid']
